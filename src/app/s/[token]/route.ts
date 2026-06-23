@@ -7,12 +7,27 @@ import { logAccess } from "@/lib/logging";
 
 export const dynamic = "force-dynamic";
 
+// Public base URL for redirects. Behind Railway's proxy, req.nextUrl.origin is
+// the INTERNAL container address (https://localhost:8080), so we must derive the
+// externally-visible URL from the forwarded headers, falling back to the
+// configured app URL, then the request origin.
+function publicOrigin(req: NextRequest): string {
+  const host = req.headers.get("x-forwarded-host") ?? req.headers.get("host");
+  if (host && !host.startsWith("localhost")) {
+    const proto = req.headers.get("x-forwarded-proto") ?? "https";
+    return `${proto}://${host}`;
+  }
+  const configured = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "");
+  if (configured && !configured.includes("localhost")) return configured;
+  return req.nextUrl.origin;
+}
+
 // Unique magic-link entry. The token (sent by email) authenticates the holder:
 // we validate it, set the holder-session cookie, and route to NDA/survey. No
 // password or email-entry step.
 export async function GET(req: NextRequest, { params }: { params: { token: string } }) {
   const token = params.token;
-  const origin = req.nextUrl.origin;
+  const origin = publicOrigin(req);
 
   let valid = false;
   let email: string | null = null;
