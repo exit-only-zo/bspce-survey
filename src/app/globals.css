@@ -1,0 +1,42 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+html,
+body {
+  padding: 0;
+  margin: 0;
+  background: #f8fafc;
+  color: #0f172a;
+}
+
+/* ---------------------------------------------------------------------------
+   Confidentiality: print protection.
+   Holder pages are strictly confidential. When printed, hide the content and
+   show a notice instead. Admin pages opt out via .allow-print.
+--------------------------------------------------------------------------- */
+@media print {
+  body[data-confidential="true"] main {
+    display: none !important;
+  }
+  body[data-confidential="true"]::after {
+    content: "Information strictement confidentielle — Matera SAS — Impression interdite.";
+    display: block;
+    padding: 4rem 2rem;
+    font-size: 1.25rem;
+    text-align: center;
+  }
+}
+
+/* Diagonal screenshot-dissuasion watermark (applied via component). */
+.confidential-watermark {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  pointer-events: none;
+  overflow: hidden;
+}
