@@ -1,13 +1,29 @@
 // Centralised env access with clear errors when something is missing.
 // Public vars are inlined by Next at build time (NEXT_PUBLIC_*).
 
+// Trim and strip a single pair of surrounding quotes — guards against env
+// values accidentally stored as `"value"` or with stray whitespace (a common
+// mistake when pasting into hosting dashboards).
+export function cleanEnv(value: string | undefined): string | undefined {
+  if (value == null) return value;
+  let s = value.trim();
+  if (
+    s.length >= 2 &&
+    ((s.startsWith('"') && s.endsWith('"')) || (s.startsWith("'") && s.endsWith("'")))
+  ) {
+    s = s.slice(1, -1).trim();
+  }
+  return s;
+}
+
 function required(name: string, value: string | undefined): string {
-  if (!value) {
+  const v = cleanEnv(value);
+  if (!v) {
     throw new Error(
       `Missing required environment variable: ${name}. See .env.example.`,
     );
   }
-  return value;
+  return v;
 }
 
 export const env = {
