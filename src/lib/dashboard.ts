@@ -71,6 +71,30 @@ interface RawData {
   requestByHolder: Map<string, ModificationStatus>;
 }
 
+// Supabase/PostgREST caps a single response at 1000 rows. With 1300+ batches,
+// an unbounded select silently truncates, making some holders' warrants read as
+// 0 and undercounting all aggregate totals. Page through with .range() until the
+// table is fully read.
+const PAGE = 1000;
+async function fetchAll<T>(
+  svc: ReturnType<typeof createServiceSupabase>,
+  table: string,
+  columns: string,
+): Promise<T[]> {
+  const out: T[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await svc
+      .from(table)
+      .select(columns)
+      .range(from, from + PAGE - 1);
+    if (error) throw new Error(`fetchAll(${table}) failed: ${error.message}`);
+    const rows = (data ?? []) as T[];
+    out.push(...rows);
+    if (rows.length < PAGE) break;
+  }
+  return out;
+}
+
 async function loadData(): Promise<RawData> {
   if (DEMO_MODE) {
     const data = getDemoData();
@@ -94,35 +118,39 @@ async function loadData(): Promise<RawData> {
   }
 
   const svc = createServiceSupabase();
-  const [holdersRes, batchesRes, overridesRes, responsesRes, requestsRes] = await Promise.all([
-    svc.from("holders").select("*"),
-    svc.from("batches").select("*"),
-    svc.from("holder_overrides").select("*"),
-    svc.from("survey_responses").select("*"),
-    svc.from("modification_requests").select("holder_id, status"),
+  const [holders, batches, overrides, responses, requests] = await Promise.all([
+    fetchAll<Holder>(svc, "holders", "*"),
+    fetchAll<Batch>(svc, "batches", "*"),
+    fetchAll<HolderOverride>(svc, "holder_overrides", "*"),
+    fetchAll<SurveyResponse>(svc, "survey_responses", "*"),
+    fetchAll<{ holder_id: string; status: ModificationStatus }>(
+      svc,
+      "modification_requests",
+      "holder_id, status",
+    ),
   ]);
 
   const batchesByHolder = new Map<string, Batch[]>();
-  for (const b of (batchesRes.data ?? []) as Batch[]) {
+  for (const b of batches) {
     const arr = batchesByHolder.get(b.holder_id) ?? [];
     arr.push(b);
     batchesByHolder.set(b.holder_id, arr);
   }
   const overrideByHolder = new Map<string, HolderOverride>();
-  for (const o of (overridesRes.data ?? []) as HolderOverride[]) {
+  for (const o of overrides) {
     overrideByHolder.set(o.holder_id, o);
   }
   const responseByHolder = new Map<string, SurveyResponse>();
-  for (const r of (responsesRes.data ?? []) as SurveyResponse[]) {
+  for (const r of responses) {
     responseByHolder.set(r.holder_id, r);
   }
   const requestByHolder = new Map<string, ModificationStatus>();
-  for (const r of (requestsRes.data ?? []) as { holder_id: string; status: ModificationStatus }[]) {
+  for (const r of requests) {
     requestByHolder.set(r.holder_id, r.status);
   }
 
   return {
-    holders: (holdersRes.data ?? []) as Holder[],
+    holders,
     batchesByHolder,
     overrideByHolder,
     responseByHolder,
