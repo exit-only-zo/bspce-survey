@@ -13,7 +13,7 @@ export const fetchCache = "force-no-store";
 export default async function HoldersPage({
   searchParams,
 }: {
-  searchParams: { q?: string; type?: string; status?: string };
+  searchParams: { q?: string; type?: string; status?: string; cessible?: string };
 }) {
   const settings = await getSettings();
   const d = await computeDashboard(settings);
@@ -22,6 +22,7 @@ export default async function HoldersPage({
   const q = (searchParams.q ?? "").trim().toLowerCase();
   const typeF = searchParams.type ?? "";
   const statusF = searchParams.status ?? "";
+  const cessibleOnly = searchParams.cessible === "1";
 
   let rows = d.rows;
   if (q) rows = rows.filter((r) => r.name.toLowerCase().includes(q) || r.email.toLowerCase().includes(q));
@@ -30,6 +31,9 @@ export default async function HoldersPage({
   if (statusF === "responded") rows = rows.filter((r) => r.hasResponse);
   if (statusF === "pending") rows = rows.filter((r) => !r.hasResponse);
   if (statusF === "review") rows = rows.filter((r) => r.needsReview);
+  if (cessibleOnly) rows = rows.filter((r) => r.maxCessible > 0);
+
+  const hiddenZero = cessibleOnly ? d.rows.filter((r) => r.maxCessible === 0).length : 0;
 
   rows = [...rows].sort((a, b) => a.name.localeCompare(b.name, "fr"));
 
@@ -69,10 +73,26 @@ export default async function HoldersPage({
             <option value="review">À revoir</option>
           </select>
         </div>
+        <label className="flex items-center gap-2 pb-1.5 text-sm text-matera-ink">
+          <input
+            type="checkbox"
+            name="cessible"
+            value="1"
+            defaultChecked={cessibleOnly}
+            className="h-4 w-4 rounded border-slate-300"
+          />
+          Masquer les 0 titre cessible
+        </label>
         <button className="rounded-lg bg-matera-primary px-4 py-2 text-sm font-medium text-white hover:opacity-90">
           Filtrer
         </button>
       </form>
+
+      {cessibleOnly && (
+        <p className="mt-2 text-xs text-matera-muted">
+          {fmtNum(hiddenZero)} détenteur(s) sans titre cessible masqué(s).
+        </p>
+      )}
 
       <div className="mt-4 overflow-x-auto rounded-xl border border-slate-200 bg-white">
         <table className="w-full text-sm">
@@ -122,7 +142,16 @@ function Row({ r, appUrl }: { r: DashboardRow; appUrl: string }) {
         </div>
       </td>
       <td className="px-3 py-2">{r.type === "current_employee" ? "Actuel" : "Ex"}</td>
-      <td className="px-3 py-2 text-right">{fmtNum(r.totalWarrants + r.ordinaryShares)}</td>
+      <td className="px-3 py-2 text-right">
+        <span className={r.maxCessible === 0 ? "text-matera-muted" : "font-medium text-matera-ink"}>
+          {fmtNum(r.maxCessible)}
+        </span>
+        {(r.totalWarrants + r.ordinaryShares) !== r.maxCessible && (
+          <span className="block text-[10px] text-matera-muted">
+            sur {fmtNum(r.totalWarrants + r.ordinaryShares)} détenus
+          </span>
+        )}
+      </td>
       <td className="px-3 py-2">
         <StatusPill hasResponse={r.hasResponse} requestStatus={r.requestStatus} label={r.responseLabel} />
       </td>

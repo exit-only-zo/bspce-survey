@@ -35,6 +35,7 @@ export interface DashboardRow {
   accessToken: string | null;
   totalWarrants: number;
   ordinaryShares: number;
+  maxCessible: number; // max titles the holder could actually sell (pool at 100%)
   responseLabel: string; // human-readable response
   hasResponse: boolean;
   requestStatus: ModificationStatus | null;
@@ -231,6 +232,9 @@ export async function computeDashboard(settings: Settings): Promise<Dashboard> {
     }
 
     const proceeds = computeProceeds(holder, batches, prices, fraction);
+    // Max sellable pool (fraction = 1): vested-only for current employees,
+    // underwater lots excluded. This is the "titres cessibles" figure.
+    const maxCessible = computeProceeds(holder, batches, prices, 1).totalTitlesOffered;
     if (proceeds.isRange) isRange = true;
     totalTitles += proceeds.totalTitlesOffered;
     totalMin += proceeds.totalProceedsMin;
@@ -249,6 +253,7 @@ export async function computeDashboard(settings: Settings): Promise<Dashboard> {
       requestStatus: data.requestByHolder.get(holder.id) ?? null,
       totalWarrants,
       ordinaryShares: holder.ordinary_shares,
+      maxCessible,
       responseLabel,
       hasResponse: !!response,
       titlesOffered: proceeds.totalTitlesOffered,
