@@ -4,6 +4,8 @@ import { useMemo, useState, useTransition } from "react";
 import {
   computeProceeds,
   bandForBatch,
+  bandForOrdinaryShares,
+  exercisedBelowStrike,
   type ResolvedPrices,
   type HoldingsSummary,
 } from "@/lib/pricing";
@@ -67,6 +69,12 @@ export default function ResponseForm(props: ResponseFormProps) {
   const activeBatches = useMemo(
     () => batches.filter((b) => b.status === "active" && b.is_vested),
     [batches],
+  );
+  // Sellable ordinary shares = exercised shares from grants priced below the
+  // buyback (no-loss). Matches computeProceeds, so the listing and the total agree.
+  const sellableOrdinary = useMemo(
+    () => exercisedBelowStrike(batches, bandForOrdinaryShares(holderType, prices).max),
+    [batches, holderType, prices],
   );
 
   const canEdit = editable && (!existing || unlocked);
@@ -181,7 +189,7 @@ export default function ResponseForm(props: ResponseFormProps) {
             <p className="font-medium">{tr.holdings.heldIntro}</p>
             <ul className="mt-2 space-y-1">
               <li>
-                <span className="font-medium">A.</span> {tr.holdings.ordinary(N(ordinaryShares))}
+                <span className="font-medium">A.</span> {tr.holdings.ordinary(N(sellableOrdinary))}
               </li>
               {activeBatches.map((b, i) => {
                 const bnd = bandForBatch(holderType, b.is_vested, prices);

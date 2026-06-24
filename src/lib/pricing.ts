@@ -158,11 +158,18 @@ export function computeProceeds(
   const sellableVested = sellable.filter((b) => b.is_vested);
   const pool = sellableVested;
   const includeOrdinary = !isCurrent;
+
+  // Ordinary (already-exercised) shares sell at the full price — but the no-loss
+  // rule applies to them too: a share exercised at a strike >= the buyback price
+  // would sell at a loss (the holder already paid more than the buyback), so we
+  // count only exercised shares whose grant strike is below that price.
+  const ordBand = bandForOrdinaryShares(holder.holder_type, prices);
+  const sellableOrdinary = includeOrdinary ? exercisedBelowStrike(batches, ordBand.max) : 0;
+
   const base = isCurrent
     ? sellable.reduce((s, b) => s + b.quantity, 0) // current: % base = vested + non-vested
-    : holder.ordinary_shares + sellableVested.reduce((s, b) => s + b.quantity, 0); // ex: ordinary + vested
-  const poolTotal =
-    (includeOrdinary ? holder.ordinary_shares : 0) + pool.reduce((s, b) => s + b.quantity, 0);
+    : sellableOrdinary + sellableVested.reduce((s, b) => s + b.quantity, 0); // ex: ordinary + vested
+  const poolTotal = sellableOrdinary + pool.reduce((s, b) => s + b.quantity, 0);
 
   // Quota of titles to sell, capped at what is actually eligible.
   let remaining = Math.min(Math.round(f * base), poolTotal);
@@ -173,10 +180,9 @@ export function computeProceeds(
   let totalTitles = 0;
 
   // 1) Ordinary shares first (already exercised; net = full price). Only part of
-  //    the offer for ex-employees.
-  const ordBand = bandForOrdinaryShares(holder.holder_type, prices);
+  //    the offer for ex-employees, and only the loss-free ones (see above).
   if (ordBand.max !== ordBand.min) isRange = true;
-  const ordEligible = includeOrdinary ? holder.ordinary_shares : 0;
+  const ordEligible = sellableOrdinary;
   const ordOffered = Math.min(remaining, ordEligible);
   remaining -= ordOffered;
   const ordMin = ordBand.min * ordOffered;
@@ -262,6 +268,24 @@ export function isSellableBatch(
 ): boolean {
   if (b.status !== "active") return false;
   return b.strike_price < bandForBatch(holderType, b.is_vested, prices).max;
+}
+
+// Total already-exercised (now ordinary) shares whose grant strike is strictly
+// below `maxPrice`. Shares exercised at a higher strike would sell at a loss and
+// are excluded (no-loss rule on ordinary shares). Deduped per grant because the
+// vested/non-vested sub-batches of one grant carry the same `meta.exercised`.
+export function exercisedBelowStrike(batches: Batch[], maxPrice: number): number {
+  const seen = new Set<string>();
+  let total = 0;
+  for (const b of batches) {
+    const ex = b.meta && typeof b.meta.exercised === "number" ? (b.meta.exercised as number) : 0;
+    if (ex <= 0) continue;
+    const key = `${b.batch_name ?? ""}__${b.strike_price}__${b.attribution_date ?? ""}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    if (b.strike_price < maxPrice) total += ex;
+  }
+  return total;
 }
 
 // Share of a holder's SELLABLE BSPCEs that is vested (0..100). Underwater lots
