@@ -62,9 +62,11 @@ export default function ResponseForm(props: ResponseFormProps) {
   const ER = (a: number, b: number) => fmtEurRange(a, b, lang);
   const band = fmtPriceBand(headline.min, headline.max, lang);
 
+  // Only vested lots are sellable (non-vested is forfeited for ex-employees and
+  // not offered to current employees), so the letter lists vested lots only.
   const activeBatches = useMemo(
-    () => batches.filter((b) => b.status === "active" && (isEx || b.is_vested)),
-    [batches, isEx],
+    () => batches.filter((b) => b.status === "active" && b.is_vested),
+    [batches],
   );
 
   const canEdit = editable && (!existing || unlocked);

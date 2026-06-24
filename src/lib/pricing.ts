@@ -131,10 +131,11 @@ function netPerTitle(price: number, strike: number): number {
 //     VESTED batches are sold; the quota is capped at the vested total, so a
 //     holder can never indicate more than what is acquired. Ordinary shares are
 //     not part of the current-employee offer.
-//   - ex_employee      : the % is of everything (ordinary + all batches), and
-//     everything is eligible (vested + non-vested, priced apart).
+//   - ex_employee      : sells ordinary shares + VESTED BSPCE only. Non-vested
+//     BSPCE are forfeited on departure (long-standing rule), so they are never
+//     eligible. Vested and ordinary are priced apart.
 //
-// voided batches are always excluded.
+// voided and non-vested-for-ex batches are always excluded from the sale.
 export function computeProceeds(
   holder: Pick<Holder, "holder_type" | "ordinary_shares">,
   batches: Batch[],
@@ -152,11 +153,14 @@ export function computeProceeds(
   );
 
   // Eligible pool (what can actually be sold) vs the % base (denominator).
-  const pool = isCurrent ? sellable.filter((b) => b.is_vested) : sellable;
+  // Only VESTED BSPCE are ever sold — for ex-employees non-vested is forfeited
+  // on departure, for current employees only acquired (vested) lots are offered.
+  const sellableVested = sellable.filter((b) => b.is_vested);
+  const pool = sellableVested;
   const includeOrdinary = !isCurrent;
   const base = isCurrent
-    ? sellable.reduce((s, b) => s + b.quantity, 0) // sellable BSPCEs (vested + non-vested)
-    : holder.ordinary_shares + sellable.reduce((s, b) => s + b.quantity, 0);
+    ? sellable.reduce((s, b) => s + b.quantity, 0) // current: % base = vested + non-vested
+    : holder.ordinary_shares + sellableVested.reduce((s, b) => s + b.quantity, 0); // ex: ordinary + vested
   const poolTotal =
     (includeOrdinary ? holder.ordinary_shares : 0) + pool.reduce((s, b) => s + b.quantity, 0);
 
