@@ -20,6 +20,7 @@ import {
 } from "@/lib/demo";
 import { getLang } from "@/lib/lang";
 import { t } from "@/lib/i18n";
+import { notifySlack } from "@/lib/slack";
 import type { HolderOverride } from "@/lib/types";
 
 const COOKIE_OPTS = { httpOnly: true, sameSite: "lax" as const, path: "/", maxAge: 60 * 60 * 8 };
@@ -180,6 +181,22 @@ export async function submitResponse(input: SubmitInput): Promise<SubmitResult> 
   });
 
   await logAccess(email, existing ? "/survey:modify" : "/survey:submit");
+
+  // Best-effort Slack ping so the deal team sees responses land in real time.
+  const who = `${holder.first_name ?? ""} ${holder.last_name ?? ""}`.trim() || holder.email;
+  const typeLabel = isEx ? "ex-employé" : "employé actuel";
+  const answer =
+    response_mode === "binary"
+      ? accepts_full_sale
+        ? "✅ Oui — cession 100 %"
+        : "❌ Non intéressé"
+      : (percentage_to_sell ?? 0) > 0
+        ? `✅ ${percentage_to_sell} %`
+        : "❌ Non (0 %)";
+  await notifySlack(
+    `📩 *Sondage BSPCE* — ${who} (${typeLabel}) ${existing ? "a modifié sa réponse" : "a répondu"} : ${answer}`,
+  );
+
   revalidatePath("/survey");
   return { ok: true };
 }
@@ -214,6 +231,10 @@ export async function requestModification(): Promise<SubmitResult> {
     { onConflict: "holder_id" },
   );
   if (error) return { ok: false, error: `Échec: ${error.message}` };
+
+  const who = `${holder.first_name ?? ""} ${holder.last_name ?? ""}`.trim() || holder.email;
+  await notifySlack(`✏️ *Sondage BSPCE* — ${who} demande à modifier sa réponse (à valider en admin).`);
+
   revalidatePath("/survey");
   return { ok: true };
 }
