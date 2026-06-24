@@ -111,6 +111,8 @@ export interface Settings {
   data_last_refreshed_at: string | null;
   test_mode: string | null;
   faq_markdown: string | null;
+  // Responses submitted before this ISO timestamp are ignored (internal tests).
+  responses_cutoff_at: string | null;
 }
 
 export type SettingKey = keyof Settings;

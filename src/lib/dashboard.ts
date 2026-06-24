@@ -176,6 +176,16 @@ function histogramBuckets(): { label: string; test: (p: number) => boolean }[] {
 export async function computeDashboard(settings: Settings): Promise<Dashboard> {
   const data = await loadData();
 
+  // Responses submitted before the cutoff are internal tests — ignore them so
+  // they don't inflate counts, totals or the Slack cumulative.
+  const cutoff = settings.responses_cutoff_at ? Date.parse(settings.responses_cutoff_at) : NaN;
+  if (!Number.isNaN(cutoff)) {
+    for (const [holderId, r] of data.responseByHolder) {
+      const t = Date.parse(r.submitted_at ?? r.last_modified_at ?? "");
+      if (!Number.isNaN(t) && t < cutoff) data.responseByHolder.delete(holderId);
+    }
+  }
+
   let respondents = 0;
   let curHolders = 0;
   let curResp = 0;

@@ -22,6 +22,7 @@ export const DEFAULT_SETTINGS: Settings = {
   data_last_refreshed_at: null,
   test_mode: "false",
   faq_markdown: null,
+  responses_cutoff_at: null,
 };
 
 export function settingBool(value: string | null | undefined): boolean {
