@@ -9,6 +9,9 @@ import { clientIp, userAgent, logAccess } from "@/lib/logging";
 import {
   maxPctForHolder,
   exEmployeeBinaryMode,
+  resolvePrices,
+  computeProceeds,
+  fractionFromResponse,
 } from "@/lib/pricing";
 import { cookies } from "next/headers";
 import {
@@ -185,16 +188,41 @@ export async function submitResponse(input: SubmitInput): Promise<SubmitResult> 
   // Best-effort Slack ping so the deal team sees responses land in real time.
   const who = `${holder.first_name ?? ""} ${holder.last_name ?? ""}`.trim() || holder.email;
   const typeLabel = isEx ? "ex-employé" : "employé actuel";
+  const positive = response_mode === "binary" ? !!accepts_full_sale : (percentage_to_sell ?? 0) > 0;
   const answer =
     response_mode === "binary"
       ? accepts_full_sale
         ? "✅ Oui — cession 100 %"
         : "❌ Non intéressé"
-      : (percentage_to_sell ?? 0) > 0
+      : positive
         ? `✅ ${percentage_to_sell} %`
         : "❌ Non (0 %)";
+
+  // Indicative proceeds for this response (same engine as the survey page).
+  let amountStr = "";
+  if (positive) {
+    try {
+      const { data: batchData } = await svc.from("batches").select("*").eq("holder_id", holder.id);
+      const prices = resolvePrices(settings, override);
+      const fraction = fractionFromResponse({ response_mode, percentage_to_sell, accepts_full_sale });
+      const pr = computeProceeds(
+        { holder_type: holder.holder_type, ordinary_shares: holder.ordinary_shares },
+        batchData ?? [],
+        prices,
+        fraction,
+      );
+      const eur = (n: number) => Math.round(n).toLocaleString("fr-FR") + " €";
+      amountStr =
+        pr.totalProceedsMin === pr.totalProceedsMax
+          ? ` — ~${eur(pr.totalProceedsMax)} (${pr.totalTitlesOffered.toLocaleString("fr-FR")} titres)`
+          : ` — ~${eur(pr.totalProceedsMin)}–${eur(pr.totalProceedsMax)} (${pr.totalTitlesOffered.toLocaleString("fr-FR")} titres)`;
+    } catch {
+      // amount is best-effort; never block the notification on it.
+    }
+  }
+
   await notifySlack(
-    `📩 *Sondage BSPCE* — ${who} (${typeLabel}) ${existing ? "a modifié sa réponse" : "a répondu"} : ${answer}`,
+    `📩 *Sondage BSPCE* — ${who} (${typeLabel}) ${existing ? "a modifié sa réponse" : "a répondu"} : ${answer}${amountStr}`,
   );
 
   revalidatePath("/survey");
