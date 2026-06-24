@@ -408,10 +408,17 @@ export default function ResponseForm(props: ResponseFormProps) {
     </div>
   );
 
+  const Disclaimer = (
+    <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+      {tr.survey.discrepancyNote(supportEmail)}
+    </p>
+  );
+
   if (!editable) {
     return (
       <div className="space-y-6">
         {Letter}
+        {Disclaimer}
         <div className="rounded-2xl border border-slate-200 bg-slate-100 p-6 text-sm text-slate-700">
           <p className="font-medium text-matera-ink">{tr.survey.closed}</p>
           {existing ? (
@@ -427,6 +434,7 @@ export default function ResponseForm(props: ResponseFormProps) {
   return (
     <div className="space-y-6">
       {Letter}
+      {Disclaimer}
       {result && !result.ok && (
         <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{result.error}</p>
       )}

@@ -62,6 +62,7 @@ interface Dict {
     testBanner: string;
     closed: string;
     notSubmitted: (email: string) => string;
+    discrepancyNote: (email: string) => string;
     logout: string;
     resetDemo: string;
     adminPreview: (email: string) => string;
@@ -150,6 +151,8 @@ const FR: Dict = {
     closed: "Le sondage est clos.",
     notSubmitted: (email) =>
       `Vous n'avez pas soumis de réponse. Contactez ${email} si vous pensez qu'il s'agit d'une erreur.`,
+    discrepancyNote: (email) =>
+      `Si vous constatez une erreur dans ces chiffres, ou un cas particulier qui n'aurait pas été pris en compte, n'hésitez pas à nous contacter à ${email} avant de répondre.`,
     logout: "Se déconnecter",
     resetDemo: "Se déconnecter (réinitialiser la démo)",
     adminPreview: (email) => `Aperçu admin du sondage de ${email}`,
@@ -242,6 +245,8 @@ const DE: Dict = {
     closed: "Die Umfrage ist geschlossen.",
     notSubmitted: (email) =>
       `Du hast keine Antwort übermittelt. Kontaktiere ${email}, falls dies ein Fehler sein sollte.`,
+    discrepancyNote: (email) =>
+      `Falls du einen Fehler in diesen Zahlen feststellst oder einen Sonderfall, der nicht berücksichtigt wurde, kontaktiere uns bitte vor deiner Antwort unter ${email}.`,
     logout: "Abmelden",
     resetDemo: "Abmelden (Demo zurücksetzen)",
     adminPreview: (email) => `Admin-Vorschau der Umfrage von ${email}`,
