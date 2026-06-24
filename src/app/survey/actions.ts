@@ -24,6 +24,7 @@ import {
 import { getLang } from "@/lib/lang";
 import { t } from "@/lib/i18n";
 import { notifySlack } from "@/lib/slack";
+import { computeDashboard } from "@/lib/dashboard";
 import type { HolderOverride } from "@/lib/types";
 
 const COOKIE_OPTS = { httpOnly: true, sameSite: "lax" as const, path: "/", maxAge: 60 * 60 * 8 };
@@ -198,6 +199,9 @@ export async function submitResponse(input: SubmitInput): Promise<SubmitResult> 
         ? `✅ ${percentage_to_sell} %`
         : "❌ Non (0 %)";
 
+  const eur = (n: number) => Math.round(n).toLocaleString("fr-FR") + " €";
+  const num = (n: number) => n.toLocaleString("fr-FR");
+
   // Indicative proceeds for this response (same engine as the survey page).
   let amountStr = "";
   if (positive) {
@@ -211,18 +215,30 @@ export async function submitResponse(input: SubmitInput): Promise<SubmitResult> 
         prices,
         fraction,
       );
-      const eur = (n: number) => Math.round(n).toLocaleString("fr-FR") + " €";
       amountStr =
         pr.totalProceedsMin === pr.totalProceedsMax
-          ? ` — ~${eur(pr.totalProceedsMax)} (${pr.totalTitlesOffered.toLocaleString("fr-FR")} titres)`
-          : ` — ~${eur(pr.totalProceedsMin)}–${eur(pr.totalProceedsMax)} (${pr.totalTitlesOffered.toLocaleString("fr-FR")} titres)`;
+          ? ` — ~${eur(pr.totalProceedsMax)} (${num(pr.totalTitlesOffered)} titres)`
+          : ` — ~${eur(pr.totalProceedsMin)}–${eur(pr.totalProceedsMax)} (${num(pr.totalTitlesOffered)} titres)`;
     } catch {
       // amount is best-effort; never block the notification on it.
     }
   }
 
+  // Running cumulative across ALL positive responses (same figures as the admin
+  // dashboard). Best-effort — never blocks the notification.
+  let cumStr = "";
+  try {
+    const d = await computeDashboard(settings);
+    cumStr =
+      d.totalProceedsMin === d.totalProceedsMax
+        ? `\n💰 Cumul intéressés : ~${eur(d.totalProceedsMax)} · ${num(d.totalTitlesForSale)} titres · ${d.totals.respondents} réponses`
+        : `\n💰 Cumul intéressés : ~${eur(d.totalProceedsMin)}–${eur(d.totalProceedsMax)} · ${num(d.totalTitlesForSale)} titres · ${d.totals.respondents} réponses`;
+  } catch {
+    // cumulative is best-effort.
+  }
+
   await notifySlack(
-    `📩 *Sondage BSPCE* — ${who} (${typeLabel}) ${existing ? "a modifié sa réponse" : "a répondu"} : ${answer}${amountStr}`,
+    `📩 *Sondage BSPCE* — ${who} (${typeLabel}) ${existing ? "a modifié sa réponse" : "a répondu"} : ${answer}${amountStr}${cumStr}`,
   );
 
   revalidatePath("/survey");
