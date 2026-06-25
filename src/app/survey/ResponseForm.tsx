@@ -64,6 +64,13 @@ export default function ResponseForm(props: ResponseFormProps) {
   const ER = (a: number, b: number) => fmtEurRange(a, b, lang);
   const band = fmtPriceBand(headline.min, headline.max, lang);
 
+  // Lot label: German uses "ESOP" terminology, so we relabel the instrument word
+  // (BSPCE/Options) accordingly while keeping the year/suffix; empty → generic.
+  const lotName = (name: string | null | undefined): string => {
+    if (!name) return lang === "de" ? "ESOP" : "BSPCE";
+    return lang === "de" ? name.replace(/bspce|otpions|options/gi, "ESOP") : name;
+  };
+
   // Only vested lots are sellable (non-vested is forfeited for ex-employees and
   // not offered to current employees), so the letter lists vested lots only.
   const activeBatches = useMemo(
@@ -112,7 +119,7 @@ export default function ResponseForm(props: ResponseFormProps) {
       if (b.offeredQuantity <= 0) continue;
       const key = `${b.batch.batch_name ?? ""}__${b.batch.strike_price}__${b.batch.attribution_date ?? ""}`;
       const g = m.get(key) ?? {
-        name: b.batch.batch_name || tr.holdings.exercise(fmtEur2(b.batch.strike_price, lang)),
+        name: b.batch.batch_name ? lotName(b.batch.batch_name) : tr.holdings.exercise(fmtEur2(b.batch.strike_price, lang)),
         offered: 0, min: 0, max: 0,
       };
       g.offered += b.offeredQuantity;
@@ -197,7 +204,7 @@ export default function ResponseForm(props: ResponseFormProps) {
                 const netMin = Math.max(bnd.min - b.strike_price, 0);
                 const netMax = Math.max(bnd.max - b.strike_price, 0);
                 const net = netMin !== netMax ? `${E2(netMin)} – ${E2(netMax)}` : E2(netMin);
-                const lot = b.batch_name || (lang === "de" ? "ESOP" : "BSPCE");
+                const lot = lotName(b.batch_name);
                 const nv = !b.is_vested ? (lang === "de" ? " (ungevestet)" : " (non vesté)") : "";
                 const atStrike =
                   lang === "de"
@@ -246,7 +253,7 @@ export default function ResponseForm(props: ResponseFormProps) {
                 {holdings.tranches.map((tt, i) => (
                   <tr key={i} className={`border-b border-slate-100 last:border-0 ${tt.sellable ? "" : "text-matera-muted"}`}>
                     <td className="px-3 py-1.5">
-                      <strong className="font-semibold">{tt.name}</strong>{" "}
+                      <strong className="font-semibold">{lotName(tt.name)}</strong>{" "}
                       <span className="text-xs text-matera-muted">({tr.holdings.exercise(E2(tt.strike))})</span>
                       {!tt.sellable && (
                         <span className="ml-1 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
