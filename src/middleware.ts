@@ -8,7 +8,7 @@ import { NextResponse, type NextRequest } from "next/server";
 // route handlers/layouts, which have DB access.
 
 // "/s" = holder magic-link entry (public; the token itself is the credential).
-const PUBLIC_PATHS = ["/login", "/api/health", "/api/resend-slack", "/s"];
+const PUBLIC_PATHS = ["/login", "/api/health", "/s"];
 
 function isPublic(pathname: string): boolean {
   return PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + "/"));
