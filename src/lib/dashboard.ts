@@ -57,6 +57,10 @@ export interface Dashboard {
   totalTitlesForSale: number;
   totalProceedsMin: number;
   totalProceedsMax: number;
+  // Cash that would flow to Matera = Σ(strike × quantity) on the BSPCE actually
+  // exercised in the sale. Excludes ordinary shares (already exercised, strike
+  // paid long ago → no new cash to the company).
+  materaCashIn: number;
   avgPctCurrent: number | null;
   histogram: { label: string; count: number }[];
   exPie: { yes: number; no: number; pending: number };
@@ -201,6 +205,7 @@ export async function computeDashboard(settings: Settings): Promise<Dashboard> {
   let totalTitles = 0;
   let totalMin = 0;
   let totalMax = 0;
+  let materaCashIn = 0;
   let isRange = false;
 
   const curPcts: number[] = [];
@@ -256,6 +261,12 @@ export async function computeDashboard(settings: Settings): Promise<Dashboard> {
     totalTitles += proceeds.totalTitlesOffered;
     totalMin += proceeds.totalProceedsMin;
     totalMax += proceeds.totalProceedsMax;
+    // Matera cash-in = strike × exercised quantity on the BSPCE sold (the
+    // exercise price paid to the company). Ordinary shares contribute nothing.
+    materaCashIn += proceeds.batches.reduce(
+      (s, b) => s + b.batch.strike_price * b.offeredQuantity,
+      0,
+    );
 
     rows.push({
       holderId: holder.id,
@@ -323,6 +334,7 @@ export async function computeDashboard(settings: Settings): Promise<Dashboard> {
     totalTitlesForSale: totalTitles,
     totalProceedsMin: totalMin,
     totalProceedsMax: totalMax,
+    materaCashIn,
     avgPctCurrent,
     histogram,
     exPie,
