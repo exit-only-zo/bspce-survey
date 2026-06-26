@@ -113,6 +113,8 @@ export interface Settings {
   faq_markdown: string | null;
   // Responses submitted before this ISO timestamp are ignored (internal tests).
   responses_cutoff_at: string | null;
+  // Explicit holder IDs whose responses are ignored (comma-separated test accounts).
+  responses_excluded_holders: string | null;
 }
 
 export type SettingKey = keyof Settings;

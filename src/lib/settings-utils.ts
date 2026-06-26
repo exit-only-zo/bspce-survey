@@ -23,6 +23,7 @@ export const DEFAULT_SETTINGS: Settings = {
   test_mode: "false",
   faq_markdown: null,
   responses_cutoff_at: null,
+  responses_excluded_holders: null,
 };
 
 export function settingBool(value: string | null | undefined): boolean {

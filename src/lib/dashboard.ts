@@ -176,8 +176,15 @@ function histogramBuckets(): { label: string; test: (p: number) => boolean }[] {
 export async function computeDashboard(settings: Settings): Promise<Dashboard> {
   const data = await loadData();
 
-  // Responses submitted before the cutoff are internal tests — ignore them so
-  // they don't inflate counts, totals or the Slack cumulative.
+  // Internal test responses are ignored so they don't inflate counts, totals or
+  // the Slack cumulative. Two mechanisms:
+  //  - responses_excluded_holders: explicit holder IDs to drop (precise).
+  //  - responses_cutoff_at: drop anything submitted before this ISO time (blunt).
+  const excluded = new Set(
+    (settings.responses_excluded_holders ?? "").split(",").map((s) => s.trim()).filter(Boolean),
+  );
+  for (const id of excluded) data.responseByHolder.delete(id);
+
   const cutoff = settings.responses_cutoff_at ? Date.parse(settings.responses_cutoff_at) : NaN;
   if (!Number.isNaN(cutoff)) {
     for (const [holderId, r] of data.responseByHolder) {
