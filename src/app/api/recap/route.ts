@@ -124,12 +124,35 @@ export async function GET(req: NextRequest) {
     `📈 Titres indiqués à la vente : *${num(dash.totalTitlesForSale)}*\n` +
     `✅ Réponses : *${respondedCount} / ${contacted}* contactés (hors Jean-Gabriel)\n` +
     `🏦 Trésorerie apportée à Matera (exercice des BSPCE, hors actions déjà exercées) : *~${eur(dash.materaCashIn)}*`;
+
+  // Per-respondent breakdown: name · titres · montant, biggest first.
+  const respLines = dash.rows
+    .filter((r) => r.hasResponse)
+    .sort((a, b) => b.proceedsMax - a.proceedsMax)
+    .map((r) => `• ${r.name} · ${num(r.titlesOffered)} titres · ${eur(r.proceedsMax)}`);
+
+  // Chunk into messages of 40 lines to stay under Slack limits.
+  const chunks: string[] = [];
+  for (let i = 0; i < respLines.length; i += 40) {
+    const part = respLines.slice(i, i + 40).join("\n");
+    const header = i === 0 ? `*Détail par répondant (${respLines.length})*\n` : "";
+    chunks.push(header + part);
+  }
   const comment = `🕗 Sans réponse (${noResp.length}) : ${noResp.join(", ")}`;
 
   const send = u.searchParams.get("send") === "1";
   if (send) {
     await notifySlack(main);
+    for (const c of chunks) await notifySlack(c);
     await notifySlack(comment);
   }
-  return NextResponse.json({ sent: send, preview_main: main, preview_comment: comment, contacted, respondedCount, noResp });
+  return NextResponse.json({
+    sent: send,
+    preview_main: main,
+    preview_detail: chunks,
+    preview_comment: comment,
+    contacted,
+    respondedCount,
+    noResp,
+  });
 }
